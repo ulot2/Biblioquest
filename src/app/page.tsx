@@ -75,9 +75,9 @@ export default function Home() {
   return (
     <>
       <Header />
-      <main className="max-w-[1240px] mx-auto px-6 py-8">
+      <main className="max-w-[1240px] mx-auto px-4 md:px-6 py-8">
         {/* Custom Quest Input */}
-        <div className="mb-10 p-6 rounded-2xl bg-charcoal border border-amber/20 shadow-lg shadow-amber/5 flex flex-col md:flex-row items-center gap-6">
+        <div className="mb-6 md:mb-10 p-6 rounded-2xl bg-charcoal border border-amber/20 shadow-lg shadow-amber/5 flex flex-col md:flex-row items-center gap-6">
           <div className="flex-1">
             <div className="flex items-center gap-2 mb-2">
               <Wand2 className="text-amber" size={20} />
@@ -111,7 +111,7 @@ export default function Home() {
           </div>
         </div>
 
-        <div className="mb-10">
+        <div className="mb-6 md:mb-10">
           <Search
             query={searchQuery}
             onSearch={setSearchQuery}

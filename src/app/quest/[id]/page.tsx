@@ -90,41 +90,43 @@ function QuestView({ id }: { id: string }) {
   };
 
   return (
-    <div className="h-screen flex flex-col bg-charcoal text-white font-sans selection:bg-amber-500/30 overflow-hidden relative">
+    <div className="lg:h-screen min-h-screen flex flex-col bg-charcoal text-white font-sans selection:bg-amber-500/30 overflow-x-hidden lg:overflow-hidden relative">
       <CombatOverlay />
 
       {/* Header / Top Bar */}
-      <header className="h-16 border-b border-white/10 flex items-center justify-between px-6 bg-black/20 backdrop-blur-md shrink-0">
+      <header className="h-16 border-b border-white/10 flex items-center justify-between px-4 md:px-6 bg-black/20 backdrop-blur-md shrink-0 sticky top-0 z-30 lg:relative">
         <Link
           href="/"
           className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors"
         >
           <ArrowLeft size={20} />
-          <span className="text-sm font-medium">Exit Quest</span>
+          <span className="text-sm font-medium hidden sm:inline">
+            Exit Quest
+          </span>
         </Link>
         <div className="flex items-center gap-2">
           <Sparkles size={16} className="text-amber" />
-          <h1 className="text-lg font-bold text-gray-200">
+          <h1 className="text-lg font-bold text-gray-200 truncate max-w-[200px] sm:max-w-none">
             {id.startsWith("custom-")
               ? decodeURIComponent(id.replace("custom-", ""))
               : `Quest ID: ${id}`}
           </h1>
         </div>
-        <div className="w-20"></div> {/* Spacer for alignment */}
+        <div className="w-10 sm:w-20"></div> {/* Spacer for alignment */}
       </header>
 
       {/* Main Game Area */}
-      <main className="flex-1 min-h-0 container mx-auto max-w-6xl p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <main className="flex-1 lg:min-h-0 container mx-auto max-w-6xl p-4 md:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 overflow-y-auto lg:overflow-hidden">
         {/* Left Column: Game Output (Story) */}
-        <div className="lg:col-span-8 flex flex-col gap-6 h-full min-h-0">
+        <div className="lg:col-span-8 flex flex-col gap-6 h-[70vh] lg:h-full lg:min-h-0">
           <div
             ref={scrollRef}
-            className="flex-1 bg-black/40 rounded-2xl border border-white/5 p-8 overflow-y-auto shadow-inner relative scroll-smooth"
+            className="flex-1 bg-black/40 rounded-2xl border border-white/5 p-4 md:p-8 overflow-y-auto shadow-inner relative scroll-smooth"
           >
             {/* Decorative gradients */}
             <div className="sticky top-0 left-0 right-0 h-20 bg-linear-to-b from-charcoal/50 to-transparent pointer-events-none z-10" />
 
-            <div className="space-y-6 text-lg leading-relaxed text-gray-300 pb-20">
+            <div className="space-y-6 text-base md:text-lg leading-relaxed text-gray-300 pb-20">
               {messages.map((msg) => (
                 <div
                   key={msg.id}
@@ -157,7 +159,7 @@ function QuestView({ id }: { id: string }) {
           </div>
 
           {/* Input Area */}
-          <div className="min-h-32 bg-black/40 rounded-xl border border-white/5 p-4 flex flex-col gap-3">
+          <div className="min-h-32 bg-black/40 rounded-xl border border-white/5 p-4 flex flex-col gap-3 shrink-0">
             <div className="flex items-center gap-2 text-sm text-gray-500 uppercase tracking-wider font-bold">
               <Sparkles size={12} />
               <span>Your Action</span>
@@ -176,7 +178,7 @@ function QuestView({ id }: { id: string }) {
                 disabled={isProcessing}
                 className="px-6 py-3 bg-amber text-black font-bold rounded-lg hover:bg-amber-400 transition-colors shadow-lg shadow-amber-500/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
               >
-                <span>Act</span>
+                <span className="hidden sm:inline">Act</span>
                 <Send size={16} />
               </button>
             </div>
@@ -184,7 +186,7 @@ function QuestView({ id }: { id: string }) {
         </div>
 
         {/* Right Column: Character & Status */}
-        <div className="lg:col-span-4 flex flex-col gap-6 h-full">
+        <div className="lg:col-span-4 flex flex-col gap-6 h-auto lg:h-full">
           {/* Character Card */}
           <div className="bg-white/5 rounded-2xl border border-white/10 p-6 flex flex-col gap-4">
             <div className="flex items-center gap-4 border-b border-white/5 pb-4">
