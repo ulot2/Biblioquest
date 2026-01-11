@@ -2,9 +2,24 @@
 
 import React, { use, useState, useEffect, useRef } from "react";
 import { useParams } from "next/navigation";
-import { ArrowLeft, BookOpen, User, Sparkles, Send } from "lucide-react";
+import {
+  ArrowLeft,
+  BookOpen,
+  User,
+  Sparkles,
+  Send,
+  Key,
+  Scroll,
+  Sword,
+  Shield,
+  FlaskConical,
+  Map as MapIcon,
+  Coins,
+  Package,
+} from "lucide-react";
 import Link from "next/link";
 import { GameProvider, useGame } from "@/context/GameContext";
+import { CombatOverlay } from "@/components/CombatOverlay";
 
 function QuestView({ id }: { id: string }) {
   const {
@@ -35,8 +50,49 @@ function QuestView({ id }: { id: string }) {
     await performAction(actionToPerform, id);
   };
 
+  const getItemIcon = (itemName: string) => {
+    const lower = itemName.toLowerCase();
+    if (lower.includes("key"))
+      return <Key size={20} className="text-amber-400" />;
+    if (
+      lower.includes("scroll") ||
+      lower.includes("note") ||
+      lower.includes("paper")
+    )
+      return <Scroll size={20} className="text-amber-100" />;
+    if (
+      lower.includes("sword") ||
+      lower.includes("blade") ||
+      lower.includes("knife") ||
+      lower.includes("dagger")
+    )
+      return <Sword size={20} className="text-red-400" />;
+    if (lower.includes("shield") || lower.includes("armor"))
+      return <Shield size={20} className="text-blue-400" />;
+    if (
+      lower.includes("potion") ||
+      lower.includes("flask") ||
+      lower.includes("elixir")
+    )
+      return <FlaskConical size={20} className="text-purple-400" />;
+    if (lower.includes("map"))
+      return <MapIcon size={20} className="text-green-400" />;
+    if (
+      lower.includes("coin") ||
+      lower.includes("gold") ||
+      lower.includes("gem")
+    )
+      return <Coins size={20} className="text-yellow-400" />;
+    if (lower.includes("book") || lower.includes("tome"))
+      return <BookOpen size={20} className="text-amber-700" />;
+
+    return <Package size={20} className="text-gray-400" />; // Fallback
+  };
+
   return (
-    <div className="h-screen flex flex-col bg-charcoal text-white font-sans selection:bg-amber-500/30 overflow-hidden">
+    <div className="h-screen flex flex-col bg-charcoal text-white font-sans selection:bg-amber-500/30 overflow-hidden relative">
+      <CombatOverlay />
+
       {/* Header / Top Bar */}
       <header className="h-16 border-b border-white/10 flex items-center justify-between px-6 bg-black/20 backdrop-blur-md shrink-0">
         <Link
@@ -48,7 +104,11 @@ function QuestView({ id }: { id: string }) {
         </Link>
         <div className="flex items-center gap-2">
           <Sparkles size={16} className="text-amber" />
-          <h1 className="text-lg font-bold text-gray-200">Quest ID: {id}</h1>
+          <h1 className="text-lg font-bold text-gray-200">
+            {id.startsWith("custom-")
+              ? decodeURIComponent(id.replace("custom-", ""))
+              : `Quest ID: ${id}`}
+          </h1>
         </div>
         <div className="w-20"></div> {/* Spacer for alignment */}
       </header>
@@ -186,13 +246,30 @@ function QuestView({ id }: { id: string }) {
               Inventory
             </h3>
             <div className="grid grid-cols-4 gap-2">
-              {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
+              {/* Render actual items */}
+              {character.inventory.map((item, i) => (
                 <div
                   key={i}
-                  className="aspect-square bg-black/20 rounded-lg border border-white/5 flex items-center justify-center hover:border-white/20 transition-colors cursor-pointer group"
+                  className="aspect-square bg-white/10 rounded-lg border border-amber/30 flex items-center justify-center hover:border-amber/60 transition-colors cursor-help group relative"
+                  title={item}
                 >
-                  <div className="w-2 h-2 rounded-full bg-white/10 group-hover:bg-amber/50 transition-colors" />
+                  {getItemIcon(item)}
+
+                  {/* Tooltip */}
+                  <div className="absolute bottom-full mb-2 hidden group-hover:block bg-black text-white text-xs px-2 py-1 rounded whitespace-nowrap z-20 border border-white/20">
+                    {item}
+                  </div>
                 </div>
+              ))}
+
+              {/* Render empty slots to fill grid up to 8 */}
+              {Array.from({
+                length: Math.max(8 - character.inventory.length, 0),
+              }).map((_, i) => (
+                <div
+                  key={`empty-${i}`}
+                  className="aspect-square bg-black/20 rounded-lg border border-white/5 flex items-center justify-center"
+                />
               ))}
             </div>
           </div>

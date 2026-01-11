@@ -2,6 +2,9 @@
 
 import React, { createContext, useContext, useState, ReactNode } from "react";
 
+// ... imports
+import { Monster, getMonster } from "@/lib/dnd";
+
 export type Message = {
   id: string;
   text: string;
@@ -18,11 +21,26 @@ export type CharacterStats = {
   inventory: string[];
 };
 
+export type CombatState = {
+  isActive: boolean;
+  enemy: Monster | null;
+  log: string[];
+};
+
 interface GameContextType {
   messages: Message[];
   addMessage: (text: string, sender: Message["sender"]) => void;
   character: CharacterStats;
   updateCharacter: (updates: Partial<CharacterStats>) => void;
+  // Combat State
+  gameMode: "EXPLORATION" | "COMBAT";
+  setGameMode: (mode: "EXPLORATION" | "COMBAT") => void;
+  combatState: CombatState;
+  updateCombatState: (updates: Partial<CombatState>) => void;
+  // Book ID
+  currentBookId: string | null;
+  setCurrentBookId: (id: string) => void;
+
   isProcessing: boolean;
   setIsProcessing: (loading: boolean) => void;
   performAction: (action: string, bookId: string) => Promise<void>;
@@ -49,6 +67,19 @@ export const GameProvider = ({ children }: { children: ReactNode }) => {
     inventory: [],
   });
 
+  // NEW: Combat State
+  const [gameMode, setGameMode] = useState<"EXPLORATION" | "COMBAT">(
+    "EXPLORATION"
+  );
+  const [combatState, setCombatState] = useState<CombatState>({
+    isActive: false,
+    enemy: null,
+    log: [],
+  });
+
+  // NEW: Book ID State
+  const [currentBookId, setCurrentBookId] = useState<string | null>(null);
+
   const [isProcessing, setIsProcessing] = useState(false);
 
   const addMessage = (text: string, sender: Message["sender"]) => {
@@ -67,6 +98,10 @@ export const GameProvider = ({ children }: { children: ReactNode }) => {
     setCharacter((prev) => ({ ...prev, ...updates }));
   };
 
+  const updateCombatState = (updates: Partial<CombatState>) => {
+    setCombatState((prev) => ({ ...prev, ...updates }));
+  };
+
   const performAction = async (action: string, bookId: string) => {
     // 1. Add user message
     addMessage(action, "user");
@@ -82,6 +117,7 @@ export const GameProvider = ({ children }: { children: ReactNode }) => {
           action,
           history: messages,
           character,
+          gameMode, // Pass current mode to AI
         }),
       });
 
@@ -94,7 +130,123 @@ export const GameProvider = ({ children }: { children: ReactNode }) => {
       // 3. Add AI response
       addMessage(data.narrative, "narrator");
 
-      // Future: Update character stats if API returns them
+      // 4. Handle Game State Updates
+      if (data.updates) {
+        const { inventory, stats, mode, enemy } = data.updates;
+        const newUpdates: Partial<CharacterStats> = {};
+
+        // COMBAT TRIGGER
+        if (mode === "COMBAT" && enemy) {
+          setGameMode("COMBAT");
+          addMessage(`⚠️ COMBAT STARTED: ${enemy}`, "system");
+
+          // Fetch Monster Details
+          getMonster(enemy).then((monster) => {
+            if (monster) {
+              setCombatState({
+                isActive: true,
+                enemy: monster,
+                log: [`${monster.name} prepares to attack!`],
+              });
+            } else {
+              addMessage(
+                `(System: Could not find stats for ${enemy})`,
+                "system"
+              );
+            }
+          });
+        }
+
+        // Inventory Updates
+        if (inventory) {
+          let currentInventory = [...character.inventory];
+
+          if (inventory.add && Array.isArray(inventory.add)) {
+            inventory.add.forEach((item: string) => {
+              if (!currentInventory.includes(item)) {
+                currentInventory.push(item);
+                addMessage(`Received: ${item}`, "system");
+              }
+            });
+          }
+
+          if (inventory.remove && Array.isArray(inventory.remove)) {
+            currentInventory = currentInventory.filter(
+              (item) => !inventory.remove.includes(item)
+            );
+            inventory.remove.forEach((item: string) => {
+              addMessage(`Lost: ${item}`, "system");
+            });
+          }
+
+          newUpdates.inventory = currentInventory;
+        }
+
+        // Stat Updates (Player & Enemy)
+        if (stats) {
+          // 1. Player Stats
+          if (stats.health) newUpdates.health = character.health + stats.health;
+          if (stats.mana) newUpdates.mana = character.mana + stats.mana;
+
+          // Clamp Player Values
+          if (newUpdates.health)
+            newUpdates.health = Math.min(
+              Math.max(newUpdates.health, 0),
+              character.maxHealth
+            );
+          if (newUpdates.mana)
+            newUpdates.mana = Math.min(
+              Math.max(newUpdates.mana, 0),
+              character.maxMana
+            );
+
+          // 2. Enemy Stats (Combat Only)
+          if (
+            gameMode === "COMBAT" &&
+            combatState.enemy &&
+            stats.enemy_damage
+          ) {
+            const damage = stats.enemy_damage;
+            const newEnemyHp = Math.max(
+              combatState.enemy.hit_points - damage,
+              0
+            );
+            const newLog = [...combatState.log];
+
+            if (data.updates.combatLog) {
+              newLog.push(...data.updates.combatLog);
+            }
+
+            // Update Combat State
+            setCombatState((prev) => ({
+              ...prev,
+              enemy: prev.enemy
+                ? { ...prev.enemy, hit_points: newEnemyHp }
+                : null,
+              log: newLog,
+            }));
+
+            // Check for Death
+            if (newEnemyHp <= 0) {
+              setGameMode("EXPLORATION");
+              addMessage(
+                `🏆 VICTORY! You defeated the ${combatState.enemy.name}!`,
+                "system"
+              );
+              setCombatState((prev) => ({
+                ...prev,
+                isActive: false,
+                enemy: null,
+                log: [],
+              }));
+            }
+          }
+        }
+
+        if (Object.keys(newUpdates).length > 0) {
+          updateCharacter(newUpdates);
+        }
+      }
     } catch (error) {
       console.error("Quest Error:", error);
       addMessage(
@@ -113,6 +265,12 @@ export const GameProvider = ({ children }: { children: ReactNode }) => {
         addMessage,
         character,
         updateCharacter,
+        gameMode,
+        setGameMode,
+        combatState,
+        updateCombatState,
+        currentBookId,
+        setCurrentBookId,
         isProcessing,
         setIsProcessing,
         performAction,

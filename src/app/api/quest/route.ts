@@ -8,29 +8,62 @@ const groq = new Groq({
 
 export async function POST(req: Request) {
   try {
-    const { bookId, action, history, character } = await req.json();
+    const { bookId, action, history, character, gameMode } = await req.json();
 
     // 1. Fetch Book Details (In a real app, we might cache this or store it in a DB)
-    // For now, we fetch metadata to get the title/author/subjects to frame the context.
     const book = await getBookById(bookId);
     const bookTitle = book?.title || "Unknown Book";
     const bookAuthor = book?.authors[0]?.name || "Unknown Author";
 
-    // 2. Construct System Prompt
-    // We act as a Dungeon Master.
-    const systemPrompt = `
+    let systemPrompt = "";
+
+    if (gameMode === "COMBAT") {
+      systemPrompt = `
+        You are the Turn-Based Combat Referee for a D&D 5e encounter in "${bookTitle}".
+        
+        Current State: Combat is ACTIVE.
+        Player Action: "${action}"
+        
+        Goal:
+        - Resolve the player's action (Attack, Spell, etc.) using D&D 5e logic (simulate dice rolls).
+        - Describe the outcome dramatically but briefly.
+        - Dictate the enemy's counter-attack.
+        
+        Output JSON:
+        {
+            "narrative": "Combat narration...",
+            "updates": {
+                "stats": { 
+                    "health": -5,        // Player HP change
+                    "enemy_damage": 8    // DAMAGE dealt to enemy (positive number)
+                },
+                "combatLog": ["Player hit Goblin for 8 dmg", "Goblin missed"]
+            }
+        }
+        `;
+    } else {
+      // EXPLORATION MODE
+      systemPrompt = `
         You are the Dungeon Master for an interactive text adventure game based on the book "${bookTitle}" by ${bookAuthor}.
         
         Your Goal:
         - Guide the player (the main character) through the story.
-        - Respond to their actions logically within the world of the book.
-        - Keep descriptions immersive but concise (max 2-3 paragraphs).
-        - Track the character's status (Health, Mana, Inventory) implicitly in your narration, but explicitly output updates in JSON if needed (not implemented yet, just focus on story).
-        - If the user's action is impossible, explain why.
+        - Respond to actions logically.
+        - DETECT COMBAT: If the player encounters a hostile entity (e.g., Monster, Bandit) that attacks or is attacked, trigger COMBAT mode.
+        - IMPORTANT: You must output strict JSON.
         
-        Format:
-        - Provide ONLY the narrative response. Do not include "Here is the response" or similar meta-text.
+        JSON Structure:
+        {
+            "narrative": "Story text...",
+            "updates": {
+                "mode": "COMBAT" (ONLY if combat starts),
+                "enemy": "Monster Name" (e.g. "Goblin", "Wolf" - use singular D&D name),
+                "inventory": { ... },
+                "stats": { ... }
+            }
+        }
         `;
+    }
 
     // 3. Construct Message History
     // We limit history to the last ~10 turns to save tokens (Groq limit).
@@ -52,17 +85,26 @@ export async function POST(req: Request) {
       messages: messages as any,
       model: "llama-3.3-70b-versatile", // Updated to supported model
       temperature: 0.7,
-      max_tokens: 500,
+      max_tokens: 800,
+      response_format: { type: "json_object" }, // Force JSON mode
     });
 
-    const narrative =
-      completion.choices[0]?.message?.content ||
-      "The world fades... (AI Error)";
+    const content = completion.choices[0]?.message?.content;
+    let responseData;
 
-    return NextResponse.json({
-      narrative,
-      // Future: data updates, options, etc.
-    });
+    try {
+      responseData = JSON.parse(content || "{}");
+    } catch (e) {
+      console.error("Failed to parse JSON response:", content);
+      // Fallback for malformed JSON
+      responseData = {
+        narrative:
+          content || "The world shifts unpredictably. (AI Parse Error)",
+        updates: {},
+      };
+    }
+
+    return NextResponse.json(responseData);
   } catch (error) {
     console.error("Quest API Error:", error);
     return NextResponse.json(
