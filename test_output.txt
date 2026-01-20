@@ -1,0 +1,9 @@
+Testing Public Domain Book...
+Title: Pride and Prejudice
+Year: 1813
+Is Public Domain: true
+
+Testing Copyrighted Book...
+Title: Harry Potter
+Year: 1900
+Is Public Domain: true

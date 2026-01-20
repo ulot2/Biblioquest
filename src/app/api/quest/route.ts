@@ -33,7 +33,7 @@ export async function POST(req: Request) {
       const book = await getBookById(bookId);
       if (book) {
         bookTitle = book.title;
-        bookAuthor = book.authors[0]?.name || "Unknown Author";
+        bookAuthor = book.authors[0] || "Unknown Author";
       }
     }
 

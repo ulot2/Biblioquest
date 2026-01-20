@@ -5,7 +5,12 @@ import { Header } from "@/components/Header";
 import { Search } from "@/components/Search";
 import { BookList } from "@/components/BookList";
 import { Book } from "@/types/types";
-import { searchBooks, calculateTheme, getCoverUrl } from "@/lib/api";
+import {
+  searchBooks,
+  calculateTheme,
+  getCoverUrl,
+  getPopularBooks,
+} from "@/lib/api";
 import { Loader2, Wand2 } from "lucide-react";
 
 import Link from "next/link";
@@ -34,24 +39,21 @@ export default function Home() {
   const fetchBooks = async (query: string) => {
     setLoading(true);
     try {
-      const results = await searchBooks(query);
+      const results = query
+        ? await searchBooks(query)
+        : await getPopularBooks();
       const mappedBooks: Book[] = results.map((b) => ({
-        id: b.id.toString(),
+        id: b.id,
         title: b.title,
-        author:
-          b.authors[0]?.name
-            .replace(/, /g, " ")
-            .split(" ")
-            .reverse()
-            .join(" ") || "Unknown",
-        description: `A classic work with ${b.download_count} downloads.`,
-        fullDescription: `Subjects: ${b.subjects.slice(0, 3).join(", ")}...`,
+        author: b.authors.join(", "),
+        description: b.description.substring(0, 150) + "...", // Truncate Google Books descriptions as they can be long
+        fullDescription: b.description,
         coverUrl:
-          getCoverUrl(b) ||
+          b.coverUrl ||
           "https://images.unsplash.com/photo-1543002588-bfa74002ed7e?q=80&w=1000&auto=format&fit=crop",
         theme: calculateTheme(b),
-        tags: b.subjects.slice(0, 3).map((s) => s.split(" -- ")[0]),
-        gutendexId: b.id,
+        tags: b.subjects?.slice(0, 3) || [],
+        isPublicDomain: b.isPublicDomain,
       }));
       setBooks(mappedBooks);
     } catch (e) {

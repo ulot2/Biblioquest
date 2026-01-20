@@ -9,4 +9,5 @@ export interface Book {
   rating?: number;
   tags?: string[];
   gutendexId?: number; // Link to original API data
+  isPublicDomain?: boolean; // New field for Hybrid Search Strategy
 }

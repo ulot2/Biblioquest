@@ -1,0 +1,29 @@
+Fetching Harry Potter from Google Books...
+Google Books Result:
+Title: Harry Potter
+Authors: J. K. Rowling
+Open Library URL: https://openlibrary.org/search.json?title=Harry%20Potter&author=J.%20K.%20Rowling&limit=3&fields=title,author_name,first_publish_year
+Full Response Docs: [
+  {
+    "author_name": [
+      "J. K. Rowling"
+    ],
+    "first_publish_year": 1900,
+    "title": "Harry Potter and the Philosopher's Stone"
+  },
+  {
+    "author_name": [
+      "J. K. Rowling"
+    ],
+    "first_publish_year": 2007,
+    "title": "Harry Potter and the Deathly Hallows"
+  },
+  {
+    "author_name": [
+      "J. K. Rowling"
+    ],
+    "first_publish_year": 2005,
+    "title": "Harry Potter and the Half-Blood Prince"
+  }
+]
+Open Library Year (via func): 1900

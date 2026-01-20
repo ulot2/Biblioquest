@@ -1,0 +1,6 @@
+Fetching Harry Potter from Google Books...
+Google Books Result:
+Title: Harry Potter
+Authors: J. K. Rowling
+Querying Open Library for: Title=Harry Potter, Author=J. K. Rowling
+Open Library Year: 1900
