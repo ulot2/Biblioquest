@@ -5,7 +5,7 @@ import { Header } from "@/components/Header";
 import { Search } from "@/components/Search";
 import { BookList } from "@/components/BookList";
 import { Book } from "@/types/types";
-import { searchBooks, calculateDifficulty, getCoverUrl } from "@/lib/api";
+import { searchBooks, calculateTheme, getCoverUrl } from "@/lib/api";
 import { Loader2, Wand2 } from "lucide-react";
 
 import Link from "next/link";
@@ -49,7 +49,7 @@ export default function Home() {
         coverUrl:
           getCoverUrl(b) ||
           "https://images.unsplash.com/photo-1543002588-bfa74002ed7e?q=80&w=1000&auto=format&fit=crop",
-        difficulty: calculateDifficulty(b),
+        theme: calculateTheme(b),
         tags: b.subjects.slice(0, 3).map((s) => s.split(" -- ")[0]),
         gutendexId: b.id,
       }));
@@ -63,7 +63,7 @@ export default function Home() {
 
   const filteredBooks = books.filter((book) => {
     if (activeFilter === "All") return true;
-    return book.difficulty === activeFilter;
+    return book.theme === activeFilter;
   });
 
   const handleCustomQuest = () => {

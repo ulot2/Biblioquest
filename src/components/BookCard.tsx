@@ -12,16 +12,21 @@ interface BookCardProps {
 export const BookCard: React.FC<BookCardProps> = ({ book }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  const getDifficultyColor = (difficulty: string) => {
-    switch (difficulty) {
-      case "Easy":
-        return "bg-green-500/20 text-green-400 border-green-500/30";
-      case "Medium":
-        return "bg-[var(--color-amber)]/20 text-[var(--color-amber)] border-[var(--color-amber)]/30"; // Using var for amber if tailwind config needs it, or fallback
-      case "Hard":
-        return "bg-red-500/20 text-red-400 border-red-500/30";
+  const getThemeColor = (theme: string) => {
+    switch (theme) {
+      case "Logic":
+      case "Mystery":
+        return "bg-purple-500/20 text-purple-400 border-purple-500/30";
+      case "Social":
+        return "bg-pink-500/20 text-pink-400 border-pink-500/30";
+      case "Occult":
+        return "bg-red-900/40 text-red-400 border-red-500/50";
+      case "Debate":
+        return "bg-blue-500/20 text-blue-400 border-blue-500/30";
+      case "Adventure":
+        return "bg-emerald-500/20 text-emerald-400 border-emerald-500/30";
       default:
-        return "bg-gray-500/20 text-gray-400 border-gray-500/30";
+        return "bg-[var(--color-amber)]/20 text-[var(--color-amber)] border-[var(--color-amber)]/30";
     }
   };
 
@@ -37,13 +42,13 @@ export const BookCard: React.FC<BookCardProps> = ({ book }) => {
           />
           <div className="absolute inset-0 bg-linear-to-t from-charcoal via-transparent to-transparent opacity-60" />
 
-          {/* Difficulty Badge */}
+          {/* Theme Badge */}
           <div
-            className={`absolute top-3 right-3 px-3 py-1 rounded-full text-xs font-semibold backdrop-blur-md border ${getDifficultyColor(
-              book.difficulty
+            className={`absolute top-3 right-3 px-3 py-1 rounded-full text-xs font-semibold backdrop-blur-md border ${getThemeColor(
+              book.theme,
             )}`}
           >
-            {book.difficulty}
+            {book.theme}
           </div>
         </div>
 
@@ -118,11 +123,11 @@ export const BookCard: React.FC<BookCardProps> = ({ book }) => {
 
                 <div className="flex-1 pt-4 md:pt-12">
                   <div
-                    className={`inline-block px-3 py-1 rounded-full text-xs font-semibold mb-2 border ${getDifficultyColor(
-                      book.difficulty
+                    className={`inline-block px-3 py-1 rounded-full text-xs font-semibold mb-2 border ${getThemeColor(
+                      book.theme,
                     )}`}
                   >
-                    {book.difficulty}
+                    {book.theme}
                   </div>
                   <h2 className="text-3xl font-bold text-white mb-1">
                     {book.title}

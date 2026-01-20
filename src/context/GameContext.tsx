@@ -2,9 +2,6 @@
 
 import React, { createContext, useContext, useState, ReactNode } from "react";
 
-// ... imports
-import { Monster, getMonster } from "@/lib/dnd";
-
 export type Message = {
   id: string;
   text: string;
@@ -13,18 +10,24 @@ export type Message = {
 };
 
 export type CharacterStats = {
-  health: number;
+  health: number; // Keep generic health/stamina
   maxHealth: number;
-  mana: number;
+  mana: number; // Could be "Mental Energy"
   maxMana: number;
   level: number;
   inventory: string[];
+  preparationPoints: number;
 };
 
-export type CombatState = {
+export type InteractionType = "PUZZLE" | "DEBATE" | "INVESTIGATION";
+
+export type InteractionState = {
   isActive: boolean;
-  enemy: Monster | null;
-  log: string[];
+  type: InteractionType | null;
+  title: string;
+  description: string;
+  progress: number; // 0-100
+  clues: string[];
 };
 
 interface GameContextType {
@@ -32,11 +35,11 @@ interface GameContextType {
   addMessage: (text: string, sender: Message["sender"]) => void;
   character: CharacterStats;
   updateCharacter: (updates: Partial<CharacterStats>) => void;
-  // Combat State
-  gameMode: "EXPLORATION" | "COMBAT";
-  setGameMode: (mode: "EXPLORATION" | "COMBAT") => void;
-  combatState: CombatState;
-  updateCombatState: (updates: Partial<CombatState>) => void;
+  // Interaction State
+  gameMode: "EXPLORATION" | "INTERACTION";
+  setGameMode: (mode: "EXPLORATION" | "INTERACTION") => void;
+  interactionState: InteractionState;
+  updateInteractionState: (updates: Partial<InteractionState>) => void;
   // Book ID
   currentBookId: string | null;
   setCurrentBookId: (id: string) => void;
@@ -44,19 +47,13 @@ interface GameContextType {
   isProcessing: boolean;
   setIsProcessing: (loading: boolean) => void;
   performAction: (action: string, bookId: string) => Promise<void>;
+  startQuest: (bookId: string) => Promise<void>;
 }
 
 const GameContext = createContext<GameContextType | undefined>(undefined);
 
 export const GameProvider = ({ children }: { children: ReactNode }) => {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: "init-1",
-      text: "The adventure begins...",
-      sender: "system",
-      timestamp: Date.now(),
-    },
-  ]);
+  const [messages, setMessages] = useState<Message[]>([]);
 
   const [character, setCharacter] = useState<CharacterStats>({
     health: 100,
@@ -65,16 +62,20 @@ export const GameProvider = ({ children }: { children: ReactNode }) => {
     maxMana: 50,
     level: 1,
     inventory: [],
+    preparationPoints: 0,
   });
 
-  // NEW: Combat State
-  const [gameMode, setGameMode] = useState<"EXPLORATION" | "COMBAT">(
-    "EXPLORATION"
+  // NEW: Interaction State
+  const [gameMode, setGameMode] = useState<"EXPLORATION" | "INTERACTION">(
+    "EXPLORATION",
   );
-  const [combatState, setCombatState] = useState<CombatState>({
+  const [interactionState, setInteractionState] = useState<InteractionState>({
     isActive: false,
-    enemy: null,
-    log: [],
+    type: null,
+    title: "",
+    description: "",
+    progress: 0,
+    clues: [],
   });
 
   // NEW: Book ID State
@@ -98,8 +99,8 @@ export const GameProvider = ({ children }: { children: ReactNode }) => {
     setCharacter((prev) => ({ ...prev, ...updates }));
   };
 
-  const updateCombatState = (updates: Partial<CombatState>) => {
-    setCombatState((prev) => ({ ...prev, ...updates }));
+  const updateInteractionState = (updates: Partial<InteractionState>) => {
+    setInteractionState((prev) => ({ ...prev, ...updates }));
   };
 
   const performAction = async (action: string, bookId: string) => {
@@ -117,7 +118,9 @@ export const GameProvider = ({ children }: { children: ReactNode }) => {
           action,
           history: messages,
           character,
-          gameMode, // Pass current mode to AI
+          inventory: character.inventory,
+          gameMode,
+          interactionState,
         }),
       });
 
@@ -132,28 +135,69 @@ export const GameProvider = ({ children }: { children: ReactNode }) => {
 
       // 4. Handle Game State Updates
       if (data.updates) {
-        const { inventory, stats, mode, enemy } = data.updates;
+        const { inventory, stats, interaction } = data.updates;
         const newUpdates: Partial<CharacterStats> = {};
 
-        // COMBAT TRIGGER
-        if (mode === "COMBAT" && enemy) {
-          setGameMode("COMBAT");
-          addMessage(`⚠️ COMBAT STARTED: ${enemy}`, "system");
+        // INTERACTION TRIGGER
+        if (interaction && interaction.active) {
+          if (gameMode !== "INTERACTION") {
+            // New interaction starting
+            setGameMode("INTERACTION");
+            addMessage(`🧩 CHALLENGE STARTED: ${interaction.title}`, "system");
+            // Give preparation points
+            newUpdates.preparationPoints =
+              (character.preparationPoints || 0) + 3;
+            addMessage(`💡 You gained 3 Preparation Points!`, "system");
+          }
 
-          // Fetch Monster Details
-          getMonster(enemy).then((monster) => {
-            if (monster) {
-              setCombatState({
-                isActive: true,
-                enemy: monster,
-                log: [`${monster.name} prepares to attack!`],
-              });
-            } else {
-              addMessage(
-                `(System: Could not find stats for ${enemy})`,
-                "system"
-              );
+          setInteractionState((prev) => ({
+            ...prev,
+            isActive: true,
+            type: interaction.type || prev.type,
+            title: interaction.title || prev.title,
+            description: interaction.description || prev.description,
+            progress:
+              interaction.progress !== undefined
+                ? interaction.progress
+                : prev.progress,
+            clues: interaction.clues || prev.clues,
+          }));
+        } else if (
+          interaction &&
+          interaction.active === false &&
+          gameMode === "INTERACTION"
+        ) {
+          // Interaction Ended
+          setGameMode("EXPLORATION");
+          addMessage(`✨ CHALLENGE RESOLVED!`, "system");
+          setInteractionState({
+            isActive: false,
+            type: null,
+            title: "",
+            description: "",
+            progress: 0,
+            clues: [],
+          });
+        }
+
+        // Handle Progress Updates during Interaction
+        if (
+          data.updates.interactionProgress !== undefined &&
+          gameMode === "INTERACTION"
+        ) {
+          setInteractionState((prev) => {
+            const newProgress = Math.min(
+              Math.max(
+                (prev.progress || 0) + data.updates.interactionProgress,
+                0,
+              ),
+              100,
+            );
+            if (newProgress >= 100) {
+              // Auto-resolve if 100%? Or wait for AI to say active: false?
+              // User prompt didn't specify auto-resolve logic, rely on AI "active: false"
             }
+            return { ...prev, progress: newProgress };
           });
         }
 
@@ -172,7 +216,7 @@ export const GameProvider = ({ children }: { children: ReactNode }) => {
 
           if (inventory.remove && Array.isArray(inventory.remove)) {
             currentInventory = currentInventory.filter(
-              (item) => !inventory.remove.includes(item)
+              (item) => !inventory.remove.includes(item),
             );
             inventory.remove.forEach((item: string) => {
               addMessage(`Lost: ${item}`, "system");
@@ -182,64 +226,30 @@ export const GameProvider = ({ children }: { children: ReactNode }) => {
           newUpdates.inventory = currentInventory;
         }
 
-        // Stat Updates (Player & Enemy)
+        // Stat Updates
         if (stats) {
-          // 1. Player Stats
           if (stats.health) newUpdates.health = character.health + stats.health;
           if (stats.mana) newUpdates.mana = character.mana + stats.mana;
+          if (stats.preparationPoints)
+            newUpdates.preparationPoints =
+              (character.preparationPoints || 0) + stats.preparationPoints;
 
           // Clamp Player Values
           if (newUpdates.health)
             newUpdates.health = Math.min(
               Math.max(newUpdates.health, 0),
-              character.maxHealth
+              character.maxHealth,
             );
           if (newUpdates.mana)
             newUpdates.mana = Math.min(
               Math.max(newUpdates.mana, 0),
-              character.maxMana
+              character.maxMana,
             );
-
-          // 2. Enemy Stats (Combat Only)
           if (
-            gameMode === "COMBAT" &&
-            combatState.enemy &&
-            stats.enemy_damage
+            newUpdates.preparationPoints &&
+            newUpdates.preparationPoints < 0
           ) {
-            const damage = stats.enemy_damage;
-            const newEnemyHp = Math.max(
-              combatState.enemy.hit_points - damage,
-              0
-            );
-            const newLog = [...combatState.log];
-
-            if (data.updates.combatLog) {
-              newLog.push(...data.updates.combatLog);
-            }
-
-            // Update Combat State
-            setCombatState((prev) => ({
-              ...prev,
-              enemy: prev.enemy
-                ? { ...prev.enemy, hit_points: newEnemyHp }
-                : null,
-              log: newLog,
-            }));
-
-            // Check for Death
-            if (newEnemyHp <= 0) {
-              setGameMode("EXPLORATION");
-              addMessage(
-                `🏆 VICTORY! You defeated the ${combatState.enemy.name}!`,
-                "system"
-              );
-              setCombatState((prev) => ({
-                ...prev,
-                isActive: false,
-                enemy: null,
-                log: [],
-              }));
-            }
+            newUpdates.preparationPoints = 0;
           }
         }
 
@@ -251,8 +261,98 @@ export const GameProvider = ({ children }: { children: ReactNode }) => {
       console.error("Quest Error:", error);
       addMessage(
         "A mysterious force prevents you from acting. (Error connecting to AI)",
-        "system"
+        "system",
       );
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const startQuest = async (bookId: string) => {
+    setIsProcessing(true);
+    try {
+      const action = "Begin the story. Describe the opening scene and setting.";
+
+      // Call API
+      const response = await fetch("/api/quest", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          bookId,
+          action,
+          history: [],
+          character,
+          gameMode,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to fetch response");
+      }
+
+      // Add AI response
+      addMessage(data.narrative, "narrator");
+
+      // Handle Game State Updates (Reuse logic if possible, or copy for now)
+      if (data.updates) {
+        const { inventory, stats, interaction } = data.updates;
+        const newUpdates: Partial<CharacterStats> = {};
+
+        // INTERACTION TRIGGER
+        if (interaction && interaction.active) {
+          setGameMode("INTERACTION");
+          addMessage(`🧩 CHALLENGE STARTED: ${interaction.title}`, "system");
+          setInteractionState((prev) => ({
+            ...prev,
+            isActive: true,
+            type: interaction.type || prev.type,
+            title: interaction.title || prev.title,
+            description: interaction.description || prev.description,
+            progress:
+              interaction.progress !== undefined
+                ? interaction.progress
+                : prev.progress,
+            clues: interaction.clues || prev.clues,
+          }));
+        }
+
+        // Inventory Updates
+        if (inventory && inventory.add && Array.isArray(inventory.add)) {
+          const currentInventory = [...character.inventory];
+          inventory.add.forEach((item: string) => {
+            if (!currentInventory.includes(item)) {
+              currentInventory.push(item);
+              addMessage(`Received: ${item}`, "system");
+            }
+          });
+          newUpdates.inventory = currentInventory;
+        }
+        // Stat Updates
+        if (stats) {
+          if (stats.health)
+            newUpdates.health = Math.min(
+              Math.max(character.health + stats.health, 0),
+              character.maxHealth,
+            );
+          if (stats.mana)
+            newUpdates.mana = Math.min(
+              Math.max(character.mana + stats.mana, 0),
+              character.maxMana,
+            );
+          if (stats.preparationPoints)
+            newUpdates.preparationPoints =
+              (character.preparationPoints || 0) + stats.preparationPoints;
+        }
+
+        if (Object.keys(newUpdates).length > 0) {
+          updateCharacter(newUpdates);
+        }
+      }
+    } catch (error) {
+      console.error("Quest Start Error:", error);
+      addMessage("Failed to start the story.", "system");
     } finally {
       setIsProcessing(false);
     }
@@ -267,13 +367,14 @@ export const GameProvider = ({ children }: { children: ReactNode }) => {
         updateCharacter,
         gameMode,
         setGameMode,
-        combatState,
-        updateCombatState,
+        interactionState,
+        updateInteractionState,
         currentBookId,
         setCurrentBookId,
         isProcessing,
         setIsProcessing,
         performAction,
+        startQuest,
       }}
     >
       {children}

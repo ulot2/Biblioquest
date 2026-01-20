@@ -8,85 +8,69 @@ const groq = new Groq({
 
 export async function POST(req: Request) {
   try {
-    const { bookId, action, history, character, gameMode } = await req.json();
+    const {
+      bookId,
+      action,
+      history,
+      character,
+      gameMode,
+      interactionState,
+      inventory,
+    } = await req.json();
 
-    // 1. Fetch Book Details (In a real app, we might cache this or store it in a DB)
-    const book = await getBookById(bookId);
-    const bookTitle = book?.title || "Unknown Book";
-    const bookAuthor = book?.authors[0]?.name || "Unknown Author";
+    let bookTitle = "Unknown Book";
+    let bookAuthor = "Unknown Author";
 
+    // 1. Logic for Book Identification
     const isCustomQuest = bookId.startsWith("custom-");
-    let systemPrompt = "";
 
     if (isCustomQuest) {
-      if (gameMode === "COMBAT") {
-        systemPrompt = `
-        You are the Turn-Based Combat Referee for a D&D 5e encounter in "${bookTitle}".
-        
-        Current State: Combat is ACTIVE.
-        Player Action: "${action}"
-        
-        Goal:
-        - Resolve the player's action (Attack, Spell, etc.) using D&D 5e logic (simulate dice rolls).
-        - Describe the outcome dramatically but briefly.
-        - Dictate the enemy's counter-attack.
-        
-        Output JSON:
-        {
-            "narrative": "Combat narration...",
-            "updates": {
-                "stats": { 
-                    "health": -5,        // Player HP change
-                    "enemy_damage": 8    // DAMAGE dealt to enemy (positive number)
-                },
-                "combatLog": ["Player hit Goblin for 8 dmg", "Goblin missed"]
-            }
-        }
-        `;
-      } else {
-        // CUSTOM QUEST EXPLORATION (D&D Enabled)
-        systemPrompt = `
-        You are the Dungeon Master for an interactive D&D 5e adventure based on the universe of "${bookTitle}".
-        
-        Your Goal:
-        - Guide the player through an open-ended adventure.
-        - Respond to actions logically using D&D 5e capability.
-        - DETECT COMBAT: If the player encounters a hostile entity that attacks or is attacked, trigger COMBAT mode.
-        - IMPORTANT: You must output strict JSON.
-        
-        JSON Structure:
-        {
-            "narrative": "Story text...",
-            "updates": {
-                "mode": "COMBAT" (ONLY if combat starts),
-                "enemy": "Monster Name" (e.g. "Goblin", "Wolf" - use singular D&D name),
-                "inventory": { ... },
-                "stats": { ... }
-            }
-        }
-        `;
-      }
+      // Do NOT call getBookById
+      bookTitle = decodeURIComponent(bookId.replace("custom-", ""));
+      bookAuthor = "the original author";
     } else {
-      // NORMAL NOVEL MODE (Pure Storytelling, No D&D)
-      systemPrompt = `
-        You are the AI Storyteller for an interactive novel adaptation of "${bookTitle}" by ${bookAuthor}.
-        
-        Your Goal:
-        - Weave a compelling narrative that adapts the book into a "Choose Your Own Adventure" style experience.
-        - Emulate the writing style, tone, and vocabulary of ${bookAuthor}.
-        - Act as a co-author, guiding the player (the protagonist) through the plot actions.
-        - Do NOT use D&D mechanics (no HP, no rolling dice, no "Combat Mode").
-        - If the player fights, describe it purely through action and prose.
-        
-        Output strict JSON:
-        {
-            "narrative": "The story text continuing the narrative or responding to the user's choice...",
-            "updates": {
-                 "inventory": { ... } // Optional: Can still track key items if relevant to the plot
-            }
-        }
-        `;
+      // Keep existing logic
+      const book = await getBookById(bookId);
+      if (book) {
+        bookTitle = book.title;
+        bookAuthor = book.authors[0]?.name || "Unknown Author";
+      }
     }
+
+    // 2. The "Narrative Director" System Prompt
+    const systemPrompt = `
+  ROLE: You are the Lead Narrative Designer adapting "${bookTitle}" by ${bookAuthor}.
+  
+  CRITICAL INSTRUCTION:
+  - If "${bookTitle}" is a famous book, use your INTERNAL KNOWLEDGE to be faithful to the plot/tone.
+  - If unknown, improvise.
+
+  GAMEPLAY RULES:
+  1. NO COMBAT. Deflect violence with narrative consequences.
+  2. INTERACTION ENGINE: Every 3-5 turns, trigger a "PUZZLE", "DEBATE", or "INVESTIGATION".
+  3. CALL TO ACTION (CRITICAL): You must ALWAYS end your "narrative" output with a direct question or a set of choices to guide the user. Never just stop talking.
+     - Bad: "The door is locked."
+     - Good: "The door is locked, but you see a glimmer of light under the frame. Do you knock, or try to pick the lock?"
+
+  CURRENT CONTEXT:
+  - Inventory: ${JSON.stringify(inventory)}
+  - Active Interaction: ${interactionState?.isActive ? JSON.stringify(interactionState) : "None"}
+
+  OUTPUT FORMAT (Strict JSON):
+  {
+    "narrative": "Story prose... [Ends with Question/Choice]",
+    "interaction": {
+      "active": boolean,
+      "type": "PUZZLE" | "DEBATE" | "INVESTIGATION",
+      "title": "String",
+      "description": "String",
+      "progress_delta": number
+    },
+    "updates": {
+      "inventory": { "add": [], "remove": [] }
+    }
+  }
+`;
 
     // 3. Construct Message History
     // We limit history to the last ~10 turns to save tokens (Groq limit).
@@ -119,12 +103,17 @@ export async function POST(req: Request) {
       responseData = JSON.parse(content || "{}");
     } catch (e) {
       console.error("Failed to parse JSON response:", content);
-      // Fallback for malformed JSON
-      responseData = {
-        narrative:
-          content || "The world shifts unpredictably. (AI Parse Error)",
-        updates: {},
-      };
+      // Fallback Logic: Regex extraction
+      const match = content?.match(/"narrative":\s*"([^"]*)"/);
+      if (match) {
+        responseData = { narrative: match[1], updates: {} };
+      } else {
+        responseData = {
+          narrative:
+            content || "The story shifts unpredictably. (AI Parse Error)",
+          updates: {},
+        };
+      }
     }
 
     return NextResponse.json(responseData);
@@ -132,7 +121,7 @@ export async function POST(req: Request) {
     console.error("Quest API Error:", error);
     return NextResponse.json(
       { error: "Failed to process quest action" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

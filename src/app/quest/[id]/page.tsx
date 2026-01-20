@@ -19,7 +19,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { GameProvider, useGame } from "@/context/GameContext";
-import { CombatOverlay } from "@/components/CombatOverlay";
+import { InteractionOverlay } from "@/components/InteractionOverlay";
 
 function QuestView({ id }: { id: string }) {
   const {
@@ -30,9 +30,11 @@ function QuestView({ id }: { id: string }) {
     isProcessing,
     setIsProcessing,
     performAction,
+    startQuest,
   } = useGame();
   const [input, setInput] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
+  const hasStartedRef = useRef(false);
 
   // Auto-scroll to bottom of messages
   useEffect(() => {
@@ -41,25 +43,46 @@ function QuestView({ id }: { id: string }) {
     }
   }, [messages]);
 
+  // Initial Quest Start
+  useEffect(() => {
+    if (messages.length === 0 && !hasStartedRef.current) {
+      hasStartedRef.current = true;
+      startQuest(id);
+    }
+  }, [id, startQuest, messages.length]);
+
   const handleAction = async () => {
     if (!input.trim() || isProcessing) return;
 
     const actionToPerform = input;
     setInput(""); // Clear input immediately
 
+    // Narrative Engine: All inputs are treated as narrative actions or puzzle solutions
     await performAction(actionToPerform, id);
   };
 
   const getItemIcon = (itemName: string) => {
     const lower = itemName.toLowerCase();
-    if (lower.includes("key"))
-      return <Key size={20} className="text-amber-400" />;
+
+    // Narrative / Puzzle Items
     if (
-      lower.includes("scroll") ||
+      lower.includes("key") ||
+      lower.includes("lockpick") ||
+      lower.includes("access")
+    )
+      return <Key size={20} className="text-amber-400" />;
+
+    if (
       lower.includes("note") ||
-      lower.includes("paper")
+      lower.includes("letter") ||
+      lower.includes("evidence") ||
+      lower.includes("paper") ||
+      lower.includes("scroll") ||
+      lower.includes("clue")
     )
       return <Scroll size={20} className="text-amber-100" />;
+
+    // RPG Fallbacks (kept for legacy support or specific story items)
     if (
       lower.includes("sword") ||
       lower.includes("blade") ||
@@ -80,10 +103,15 @@ function QuestView({ id }: { id: string }) {
     if (
       lower.includes("coin") ||
       lower.includes("gold") ||
-      lower.includes("gem")
+      lower.includes("gem") ||
+      lower.includes("money")
     )
       return <Coins size={20} className="text-yellow-400" />;
-    if (lower.includes("book") || lower.includes("tome"))
+    if (
+      lower.includes("book") ||
+      lower.includes("tome") ||
+      lower.includes("diary")
+    )
       return <BookOpen size={20} className="text-amber-700" />;
 
     return <Package size={20} className="text-gray-400" />; // Fallback
@@ -91,7 +119,7 @@ function QuestView({ id }: { id: string }) {
 
   return (
     <div className="lg:h-screen min-h-screen flex flex-col bg-charcoal text-white font-sans selection:bg-amber-500/30 overflow-x-hidden lg:overflow-hidden relative">
-      <CombatOverlay />
+      <InteractionOverlay />
 
       {/* Header / Top Bar */}
       <header className="h-16 border-b border-white/10 flex items-center justify-between px-4 md:px-6 bg-black/20 backdrop-blur-md shrink-0 sticky top-0 z-30 lg:relative">
@@ -152,7 +180,7 @@ function QuestView({ id }: { id: string }) {
               {isProcessing && (
                 <div className="text-gray-500 animate-pulse flex gap-1 items-center">
                   <Sparkles size={14} />
-                  <span>The world reacts...</span>
+                  <span>The story unfolds...</span>
                 </div>
               )}
             </div>
@@ -170,7 +198,7 @@ function QuestView({ id }: { id: string }) {
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && handleAction()}
-                placeholder="What do you want to do?"
+                placeholder="What will you do? (e.g., 'Inspect the letter', 'Ask about the will')"
                 className="flex-1 bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-amber/50 placeholder:text-gray-600 transition-colors"
               />
               <button
@@ -194,18 +222,17 @@ function QuestView({ id }: { id: string }) {
                 <User size={24} />
               </div>
               <div>
-                <h2 className="text-lg font-bold text-white">Adventurer</h2>
+                <h2 className="text-lg font-bold text-white">Protagonist</h2>
                 <div className="flex items-center gap-2 text-xs text-amber">
+                  {/* Narrative Role/Level */}
                   <span>Level {character.level}</span>
-                  <span className="w-1 h-1 rounded-full bg-gray-600" />
-                  <span>Novice</span>
                 </div>
               </div>
             </div>
 
             <div className="space-y-3">
               <div className="flex justify-between text-sm">
-                <span className="text-gray-400">Health</span>
+                <span className="text-gray-400">Stamina</span>
                 <span className="text-green-400 font-mono">
                   {character.health}/{character.maxHealth}
                 </span>
@@ -223,8 +250,16 @@ function QuestView({ id }: { id: string }) {
                 />
               </div>
 
+              {/* Preparation Points Display */}
               <div className="flex justify-between text-sm mt-2">
-                <span className="text-gray-400">Mana</span>
+                <span className="text-gray-400">Preparation Points</span>
+                <span className="text-amber font-mono text-lg">
+                  {character.preparationPoints || 0}
+                </span>
+              </div>
+
+              <div className="flex justify-between text-sm mt-2">
+                <span className="text-gray-400">Focus</span>
                 <span className="text-blue-400 font-mono">
                   {character.mana}/{character.maxMana}
                 </span>
@@ -245,7 +280,7 @@ function QuestView({ id }: { id: string }) {
           {/* Inventory / Stats Placeholder */}
           <div className="flex-1 bg-white/5 rounded-2xl border border-white/10 p-6">
             <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-4 border-b border-white/5 pb-2">
-              Inventory
+              Clues & Items
             </h3>
             <div className="grid grid-cols-4 gap-2">
               {/* Render actual items */}

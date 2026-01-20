@@ -25,7 +25,7 @@ export interface GutendexResponse {
 }
 
 export const searchBooks = async (
-  query: string = ""
+  query: string = "",
 ): Promise<GutendexBook[]> => {
   try {
     const url = query
@@ -57,13 +57,52 @@ export const getBookById = async (id: string): Promise<GutendexBook | null> => {
   }
 };
 
-// Start Quest Button Utility - Generates a difficulty based on book length or complexity (Mocked for now)
-export const calculateDifficulty = (
-  book: GutendexBook
-): "Easy" | "Medium" | "Hard" => {
-  if (book.download_count > 5000) return "Easy"; // Highly popular often means accessible
-  if (book.download_count > 1000) return "Medium";
-  return "Hard";
+// Start Quest Button Utility - Generates a theme based on book content
+export const calculateTheme = (book: GutendexBook): string => {
+  const text = (book.title + " " + book.subjects.join(" ")).toLowerCase();
+
+  if (
+    text.includes("mystery") ||
+    text.includes("detective") ||
+    text.includes("sherlock") ||
+    text.includes("crime")
+  ) {
+    return "Logic";
+  }
+  if (
+    text.includes("love") ||
+    text.includes("romance") ||
+    text.includes("austen") ||
+    text.includes("pride")
+  ) {
+    return "Social";
+  }
+  if (
+    text.includes("horror") ||
+    text.includes("dracula") ||
+    text.includes("ghost") ||
+    text.includes("frankenstein")
+  ) {
+    return "Occult";
+  }
+  if (
+    text.includes("philosophy") ||
+    text.includes("politics") ||
+    text.includes("society") ||
+    text.includes("government")
+  ) {
+    return "Debate";
+  }
+  if (
+    text.includes("war") ||
+    text.includes("history") ||
+    text.includes("adventure") ||
+    text.includes("sea")
+  ) {
+    return "Adventure";
+  }
+
+  return "Literary"; // Default
 };
 
 export const getCoverUrl = (book: GutendexBook): string => {

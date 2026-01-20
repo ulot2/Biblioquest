@@ -4,7 +4,7 @@ export interface Book {
   author: string;
   description: string;
   coverUrl: string;
-  difficulty: "Easy" | "Medium" | "Hard";
+  theme: string; // Replaces difficulty
   fullDescription?: string;
   rating?: number;
   tags?: string[];
